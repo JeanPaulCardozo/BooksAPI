@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+
 class BookSchema(BaseModel):
     id: int
     title: str
@@ -8,9 +9,11 @@ class BookSchema(BaseModel):
     author: str
     price: float
     yearrelease: int
-    
+    user_id: int
+
     class Config:
         from_attributes = True
+
 
 class AddUpdateBookSchema(BaseModel):
     title: str
@@ -18,6 +21,6 @@ class AddUpdateBookSchema(BaseModel):
     author: str
     price: float
     yearrelease: int
-    
+
     class Config:
         from_attributes = True
