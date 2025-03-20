@@ -5,8 +5,8 @@ from Routes.routes_users import routerUser
 
 app = FastAPI()
 
-app.include_router(routerUser, prefix="/Users", tags=["Users"])
-app.include_router(routerBook, prefix="/Books", tags=["Books"])
+app.include_router(routerUser, tags=["Users"])
+app.include_router(routerBook, tags=["Books"])
 
 
 # Create the database tables in postgresql
