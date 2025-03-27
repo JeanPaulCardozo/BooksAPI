@@ -3,8 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import SessionLocal
 from Models.models import User
-from Schemas.schemas_users import UserSchema, AddUpdateUserSchema
+from Schemas.schemas_users import UpdateUserSchema
 from typing import List
+from Authorization import get_current_user
+from Blacklist import blacklist_token
 
 routerUser = APIRouter()
 
@@ -15,44 +17,14 @@ async def get_session_db():
         yield session
 
 
-# Get All Users
-@routerUser.get("/Users", response_model=List[UserSchema])
-async def getAllUsers(db: AsyncSession = Depends(get_session_db)):
-    result = await db.execute(select(User))
-    users = result.scalars().all()
-    return users
-
-
-# Get Specific User
-@routerUser.get("/Users/{User_id}", response_model=List[UserSchema])
-async def getUser(User_id: int, db: AsyncSession = Depends(get_session_db)):
-    result = await db.execute(select(User).filter(User.id == User_id))
-    user = result.scalars().first()
-
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return [user]
-
-
-# Add User
-@routerUser.post("/Users", response_model=List[AddUpdateUserSchema])
-async def addUser(
-    user: AddUpdateUserSchema, db: AsyncSession = Depends(get_session_db)
-):
-
-    newUser = User(**user.dict())
-    db.add(newUser)
-    await db.commit()
-    await db.refresh(newUser)
-    return [newUser]
-
-
 # Update User
-@routerUser.put("/Users/{User_id}", response_model=List[AddUpdateUserSchema])
+@routerUser.put("/User", response_model=List[UpdateUserSchema])
 async def updateUser(
-    User_id: int, user: AddUpdateUserSchema, db: AsyncSession = Depends(get_session_db)
+    user: UpdateUserSchema,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session_db),
 ):
-    result = await db.execute(select(User).filter(User.id == User_id))
+    result = await db.execute(select(User).filter(User.id == current_user.id))
     existing_user = result.scalars().first()
 
     if existing_user is None:
@@ -65,10 +37,14 @@ async def updateUser(
     await db.refresh(existing_user)
     return [existing_user]
 
+
 # remove User
-@routerUser.delete("/Users/{User_id}", response_model=List[UserSchema])
-async def removeUser(User_id: int, db: AsyncSession = Depends(get_session_db)):
-    result = await db.execute(select(User).filter(User.id == User_id))
+@routerUser.delete("/User")
+async def removeUser(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session_db),
+):
+    result = await db.execute(select(User).filter(User.id == current_user.id))
     user = result.scalars().first()
 
     if user is None:
@@ -76,15 +52,5 @@ async def removeUser(User_id: int, db: AsyncSession = Depends(get_session_db)):
 
     await db.delete(user)
     await db.commit()
-    return [user]
-
-#remove all users
-@routerUser.delete("/Users", response_model=List[UserSchema])
-async def removeUsers(db: AsyncSession = Depends(get_session_db)):
-    result = await db.execute(select(User))
-    users = result.scalars().all()
-    
-    for user in users:
-        await db.delete(user)
-        await db.commit()
-    return users
+    blacklist_token(current_user.password_hash)
+    return {"msg": "User has been removed"}

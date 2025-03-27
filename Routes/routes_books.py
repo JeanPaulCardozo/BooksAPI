@@ -5,6 +5,7 @@ from database import SessionLocal
 from Models.models import Book, User
 from Schemas.schemas_books import BookSchema, AddUpdateBookSchema
 from typing import List
+from Authorization import get_current_user
 
 routerBook = APIRouter()
 
@@ -16,20 +17,25 @@ async def get_session_db():
 
 
 # Get All Books
-@routerBook.get("/Users/{User_id}/Books", response_model=List[BookSchema])
-async def getBooks(User_id: int, db: AsyncSession = Depends(get_session_db)):
-    result = await db.execute(select(Book).filter(Book.user_id == User_id))
+@routerBook.get("/Books", response_model=List[BookSchema])
+async def getBooks(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session_db),
+):
+    result = await db.execute(select(Book).filter(Book.user_id == current_user.id))
     books = result.scalars().all()
     return books
 
 
 # Get Specific Book
-@routerBook.get("/Users/{User_id}/Books/{Book_id}", response_model=BookSchema)
+@routerBook.get("/Books/{Book_id}", response_model=BookSchema)
 async def getBook(
-    User_id: int, Book_id: int, db: AsyncSession = Depends(get_session_db)
+    Book_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session_db),
 ):
     result = await db.execute(
-        select(Book).filter(Book.user_id == User_id, Book.id == Book_id)
+        select(Book).filter(Book.user_id == current_user.id, Book.id == Book_id)
     )
     book = result.scalars().first()
 
@@ -39,12 +45,14 @@ async def getBook(
 
 
 # Remove a Book
-@routerBook.delete("/Users/{User_id}/Books/{Book_id}", response_model=List[BookSchema])
+@routerBook.delete("/Books/{Book_id}", response_model=List[BookSchema])
 async def RemoveBook(
-    User_id: int, Book_id: int, db: AsyncSession = Depends(get_session_db)
+    Book_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session_db),
 ):
     result = await db.execute(
-        select(Book).filter(Book.user_id == User_id, Book.id == Book_id)
+        select(Book).filter(Book.user_id == current_user.id, Book.id == Book_id)
     )
     book = result.scalars().first()
 
@@ -57,17 +65,19 @@ async def RemoveBook(
 
 
 # Add a Book
-@routerBook.post("/Users/{User_id}/Books", response_model=List[AddUpdateBookSchema])
+@routerBook.post("/Books", response_model=List[AddUpdateBookSchema])
 async def AddBook(
-    User_id: int, book: AddUpdateBookSchema, db: AsyncSession = Depends(get_session_db)
+    book: AddUpdateBookSchema,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session_db),
 ):
-    result = await db.execute(select(User).filter(User.id == User_id))
+    result = await db.execute(select(User).filter(User.id == current_user.id))
     user = result.scalars().first()
 
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    newBook = Book(**book.dict(), user_id=User_id)
+    newBook = Book(**book.dict(), user_id=current_user.id)
     db.add(newBook)
     await db.commit()
     await db.refresh(newBook)
@@ -75,17 +85,15 @@ async def AddBook(
 
 
 # Update a Book
-@routerBook.put(
-    "/Users/{User_id}/Books/{Book_id}", response_model=List[AddUpdateBookSchema]
-)
+@routerBook.put("/Books/{Book_id}", response_model=List[AddUpdateBookSchema])
 async def UpdateBook(
-    User_id: int,
     Book_id: int,
     book: AddUpdateBookSchema,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_session_db),
 ):
     result = await db.execute(
-        select(Book).filter(Book.user_id == User_id, Book.id == Book_id)
+        select(Book).filter(Book.user_id == current_user.id, Book.id == Book_id)
     )
     existingBook = result.scalars().first()
 
@@ -101,9 +109,12 @@ async def UpdateBook(
 
 
 # Remove All Books from a User
-@routerBook.delete("Users/{User_id}/Books", response_model=List[BookSchema])
-async def RemoveAllBooks(User_id: int, db: AsyncSession = Depends(get_session_db)):
-    result = await db.execute(select(Book).filter(Book.user_id == User_id))
+@routerBook.delete("/Books", response_model=List[BookSchema])
+async def RemoveAllBooks(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session_db),
+):
+    result = await db.execute(select(Book).filter(Book.user_id == current_user.id))
     books = result.scalars().all()
 
     if books is None:

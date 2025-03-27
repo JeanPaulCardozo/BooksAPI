@@ -8,8 +8,10 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String, nullable=False)
+    email = Column(String, nullable=False, unique=True)
+    password_hash = Column(String, nullable=False)
 
-    books = relationship("Book", back_populates="user")
+    books = relationship("Book", back_populates="user", cascade="all, delete")
 
 
 class Book(Base):
